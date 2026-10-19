@@ -3,6 +3,7 @@ import unittest
 from industrial_fault_agent.agent import FaultDiagnosisAgent
 from industrial_fault_agent.evaluate import evaluate
 from industrial_fault_agent.synthetic import generate_signal
+from industrial_fault_agent.matlab_adapter import MatlabPAJCTCNAdapter
 
 
 class AgentTests(unittest.TestCase):
@@ -23,6 +24,11 @@ class AgentTests(unittest.TestCase):
         report = FaultDiagnosisAgent().diagnose(signal)
         self.assertEqual(report.fault_family, "uncertain")
         self.assertTrue(report.uncertainty)
+
+    def test_pa_jc_adapter_enforces_contract_without_running_matlab(self):
+        adapter = object.__new__(MatlabPAJCTCNAdapter)
+        with self.assertRaises(ValueError):
+            adapter.predict([[0.0]])
 
 
 if __name__ == "__main__":

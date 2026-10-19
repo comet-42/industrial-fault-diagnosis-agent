@@ -40,6 +40,37 @@ class FaultDiagnosisAgent:
             uncertainty=uncertainty, run_id=run_id or self._run_id(signal),
         )
 
+    def diagnose_pa_jc(self, window, adapter, *, run_id: Optional[str] = None) -> DiagnosisReport:
+        """Diagnose a standardized 15x500 window with the real PA-JC model."""
+        from .models import ToolTrace
+        from .tools import retrieve_knowledge
+        import numpy as np
+        value = np.asarray(window)
+        result = adapter.predict(value)
+        label_map = {
+            "Normal": "normal", "OpenCircuit": "phase_open",
+            "GroundUnbalance": "ground_unbalance", "Interturn": "interturn_short",
+            "Demagnetization": "demagnetization", "SensorBias": "sensor_bias",
+            "SensorNoise": "sensor_noise",
+        }
+        label = label_map.get(result["fault_name"], result["fault_name"])
+        knowledge, knowledge_trace = retrieve_knowledge(label)
+        confidence = float(result["confidence"])
+        trace = ToolTrace("pa_jc_hmt_tcn", "Run the frozen PA-JC-HMT-TCN multi-task model.",
+                          {"shape": list(value.shape), "model": result.get("model_name", "unknown")},
+                          {"fault": result["fault_name"], "module": result["module_name"], "severity": result["severity"]})
+        return DiagnosisReport(
+            diagnosis=knowledge["claim"], fault_family=label,
+            severity=float(result["severity"]), confidence=confidence,
+            recommended_action=knowledge["recommended_action"],
+            evidence=[Evidence("pa_jc_hmt_tcn", "fault head", result["fault_name"], confidence),
+                      Evidence("pa_jc_hmt_tcn", "module head", result["module_name"], confidence),
+                      Evidence("pa_jc_hmt_tcn", "severity head", result["severity"], confidence),
+                      Evidence("pmsm-fault-kb-v1", "engineering interpretation", knowledge["claim"], 0.90)],
+            tool_trace=[trace, knowledge_trace], uncertainty=[],
+            run_id=run_id or "pa-jc-" + str(result.get("model_name", "frozen")),
+        )
+
     @staticmethod
     def _run_id(signal: SignalRecord) -> str:
         payload = json.dumps(signal.to_dict(), sort_keys=True, separators=(",", ":"))

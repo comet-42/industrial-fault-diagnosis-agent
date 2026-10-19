@@ -8,4 +8,5 @@ build/
 data/raw/
 data/private/
 reports/generated/
+tmp_pa_jc/
 .env

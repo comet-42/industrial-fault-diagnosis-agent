@@ -42,6 +42,26 @@ Example output includes `fault_family`, `confidence`, `severity`, `evidence`, `r
 
 The adapter should load a frozen artifact, record its version, and never bypass `validate_diagnosis`. Private data and model binaries belong outside this repository; use `data/private/` locally (it is ignored by Git).
 
+### Real PA-JC-HMT-TCN integration
+
+The repository now includes a MATLAB bridge for the real frozen `TCN_V2` dlnetwork in `matlab/predict_pa_jc_hmt_tcn.m` and a Python adapter in `src/industrial_fault_agent/matlab_adapter.py`. Keep the `.mat` artifact on the local machine and point the adapter at it:
+
+```python
+import numpy as np
+from industrial_fault_agent import FaultDiagnosisAgent
+from industrial_fault_agent.matlab_adapter import MatlabPAJCTCNAdapter
+
+adapter = MatlabPAJCTCNAdapter(
+    r"C:\\path\\to\\TCN_V2\\seed_51001\\development_network.mat",
+    matlab_executable=r"D:\\ruanjian\\Matlab r2026a\\bin\\matlab.exe",
+)
+window = np.loadtxt("standardized_window_15x500.csv", delimiter=",")
+report = FaultDiagnosisAgent().diagnose_pa_jc(window, adapter)
+print(report.to_dict())
+```
+
+The adapter enforces the model contract: standardized shape `15x500`, channel order `i1a,i1b,i1c,i2a,i2b,i2c,i3a,i3b,i3c,rd1,rq1,rd2,rq2,rd3,rq3`, and finite values. It calls MATLAB's `dlnetwork/predict` with the three real heads (`fault_softmax`, `module_softmax`, `severity_sigmoid`) and returns the seven fault classes, module, severity, scores, and model name. See `docs/pa_jc_integration.md` for provenance and preprocessing requirements.
+
 An optional ONNX inference adapter is available in `src/industrial_fault_agent/onnx_adapter.py` (`pip install -e '.[onnx]'`). The adapter accepts `[channels, samples]` and currently provides the generic classifier contract. Connecting the existing PA-JC-HMT-TCN requires an export with a documented channel order, normalization statistics, output class order, and treatment of its multitask heads; those details must match the frozen training pipeline exactly.
 
 ## Evaluation
