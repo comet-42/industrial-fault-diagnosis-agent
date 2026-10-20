@@ -1,6 +1,9 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from industrial_fault_agent.agent import AgentState, LLMPlanner, FaultDiagnosisAgent
+from industrial_fault_agent.config import load_local_env, write_llm_env
 from industrial_fault_agent.models import TaskRequest
 from industrial_fault_agent.natural_language import DeepSeekTaskParser, NaturalLanguageAgent, RuleBasedTaskParser
 from industrial_fault_agent.synthetic import generate_signal
@@ -64,6 +67,17 @@ class NaturalLanguageTests(unittest.TestCase):
         self.assertEqual(task.focus_fault, "phase_open")
         self.assertEqual(task.confidence_threshold, 0.8)
         self.assertTrue(task.require_evidence)
+
+    def test_local_model_config_is_quoted_and_preserves_other_settings(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / ".env"
+            path.write_text("ONNX_MODEL_PATH=data/private/model.onnx\n", encoding="utf-8")
+            write_llm_env(path, model="deepseek-chat", api_key='sk-test#value"x')
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("ONNX_MODEL_PATH=data/private/model.onnx", text)
+            self.assertIn('DEEPSEEK_API_KEY="sk-test#value\\"x"', text)
+            values = load_local_env(path)
+            self.assertEqual(values["DEEPSEEK_MODEL"], "deepseek-chat")
 
 
 if __name__ == "__main__":

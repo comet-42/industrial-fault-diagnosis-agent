@@ -44,6 +44,14 @@ python -m industrial_fault_agent.cli ask --parser deepseek --request "分析 dat
 
 Set `FAULT_AGENT_PARSER=deepseek` to make DeepSeek the CLI default after configuring the key. The response is parsed as JSON and validated against the same `TaskRequest` schema before it reaches the Agent. If the key or network is unavailable, use `--parser rules` for the deterministic offline parser. `OpenAITaskParser` remains available for other OpenAI-compatible endpoints. The deterministic planner remains the local fallback. `LLMPlanner` can propose only a registered, currently available tool, and the executor continues to own preconditions, evidence checks, and escalation.
 
+To configure the model interactively, run:
+
+```bash
+python scripts/configure_model.py
+```
+
+The script offers `deepseek-chat` and `deepseek-reasoner`, hides API-key input, and writes only to the Git-ignored `.env` file. It does not validate or transmit the key; the first real request performs the provider call.
+
 ## Why this is an Agent project
 
 The system is more than a classifier. It executes a goal-driven state/action loop with a tool registry. At each step the planner scores applicable tools from the current state, chooses one action, observes the result, and replans. A normal case skips targeted analysis; sensor-bias and interturn candidates trigger different evidence tools. The Agent records its decisions, retrieves domain knowledge, and refuses to issue a confident diagnosis when quality gates fail.

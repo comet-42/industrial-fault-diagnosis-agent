@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Optional, Protocol
 
 from .agent import FaultDiagnosisAgent
+from .config import load_local_env
 from .models import DiagnosisReport, SignalRecord, TaskRequest
 
 
@@ -162,6 +163,7 @@ class DeepSeekTaskParser(OpenAITaskParser):
     def __init__(self, client: Any = None, *, model: Optional[str] = None,
                  api_key: Optional[str] = None,
                  base_url: str = "https://api.deepseek.com"):
+        load_local_env()
         key = api_key or os.getenv("DEEPSEEK_API_KEY")
         if client is None and not key:
             raise RuntimeError("DeepSeek parser requires DEEPSEEK_API_KEY")

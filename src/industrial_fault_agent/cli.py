@@ -6,11 +6,13 @@ import os
 import sys
 
 from .agent import FaultDiagnosisAgent
+from .config import load_local_env
 from .natural_language import DeepSeekTaskParser, NaturalLanguageAgent, RuleBasedTaskParser
 from .synthetic import FAULTS, generate_signal
 
 
 def main() -> None:
+    load_local_env()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Run the industrial fault diagnosis agent")
