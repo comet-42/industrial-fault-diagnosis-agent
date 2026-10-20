@@ -2,14 +2,15 @@
 
 The parser produces a small, validated :class:`TaskRequest`; it never gets to
 call diagnostic tools directly.  This separation lets a local rule parser,
-an OpenAI parser, or an on-premise language model share the same runtime and
-safety gates.
+DeepSeek, another OpenAI-compatible endpoint, or an on-premise language model
+share the same runtime and safety gates.
 """
 
 from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Optional, Protocol
@@ -88,25 +89,28 @@ class RuleBasedTaskParser:
 
 
 class OpenAITaskParser:
-    """Optional structured parser backed by the OpenAI Python SDK.
+    """Optional structured parser backed by an OpenAI-compatible SDK client.
 
     The returned JSON is validated by :class:`TaskRequest` and unknown fields
     are ignored.  Install the optional dependency with ``pip install -e '.[llm]'``;
     callers can inject a fake ``client`` for offline tests.
     """
 
-    def __init__(self, client: Any = None, *, model: str = "gpt-5-mini"):
+    def __init__(self, client: Any = None, *, model: str = "gpt-5-mini",
+                 api_key: Optional[str] = None, base_url: Optional[str] = None):
         if client is None:
             try:
                 from openai import OpenAI
             except ImportError as exc:  # pragma: no cover - depends on optional extra
                 raise RuntimeError("OpenAI parser requires the optional 'llm' dependency") from exc
-            client = OpenAI()
+            client = OpenAI(api_key=api_key, base_url=base_url)
         self.client = client
         self.model = model
+        self.response_format = {"type": "json_schema", "json_schema": {"name": "task_request", "strict": True, "schema": self._schema()}}
 
-    def parse(self, request: str) -> TaskRequest:
-        schema = {
+    @staticmethod
+    def _schema() -> dict[str, Any]:
+        return {
             "type": "object",
             "properties": {
                 "input_path": {"type": ["string", "null"]},
@@ -118,6 +122,8 @@ class OpenAITaskParser:
             "required": ["input_path", "focus_fault", "confidence_threshold", "require_evidence", "output_format"],
             "additionalProperties": False,
         }
+
+    def parse(self, request: str) -> TaskRequest:
         response = self.client.chat.completions.create(
             model=self.model,
             temperature=0,
@@ -125,10 +131,14 @@ class OpenAITaskParser:
                 {"role": "system", "content": "Extract a diagnosis task. Return only the requested JSON schema. Do not invent paths or fault labels."},
                 {"role": "user", "content": request},
             ],
-            response_format={"type": "json_schema", "json_schema": {"name": "task_request", "strict": True, "schema": schema}},
+            response_format=self.response_format,
         )
         content = response.choices[0].message.content
         values = json.loads(content)
+        return self._task_from_values(values, request)
+
+    @staticmethod
+    def _task_from_values(values: dict[str, Any], request: str) -> TaskRequest:
         allowed_faults = set(_FAULT_ALIASES.values())
         focus = values.get("focus_fault")
         if focus and focus not in allowed_faults:
@@ -139,6 +149,25 @@ class OpenAITaskParser:
             require_evidence=bool(values.get("require_evidence", False)),
             output_format=values.get("output_format", "json"), original_request=request,
         )
+
+
+class DeepSeekTaskParser(OpenAITaskParser):
+    """Natural-language parser using DeepSeek's OpenAI-compatible API.
+
+    DeepSeek's JSON-object mode is used instead of assuming provider-specific
+    JSON-schema support.  The response is still validated locally before it
+    can affect the diagnosis Agent.
+    """
+
+    def __init__(self, client: Any = None, *, model: Optional[str] = None,
+                 api_key: Optional[str] = None,
+                 base_url: str = "https://api.deepseek.com"):
+        key = api_key or os.getenv("DEEPSEEK_API_KEY")
+        if client is None and not key:
+            raise RuntimeError("DeepSeek parser requires DEEPSEEK_API_KEY")
+        super().__init__(client, model=model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+                         api_key=key, base_url=base_url)
+        self.response_format = {"type": "json_object"}
 
 
 def load_signal_csv(path: str | Path, *, sample_rate_hz: float = 2500.0) -> SignalRecord:

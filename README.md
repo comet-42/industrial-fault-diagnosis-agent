@@ -34,7 +34,15 @@ python -m industrial_fault_agent.cli ask \
   --pretty
 ```
 
-`RuleBasedTaskParser` is the offline default. `OpenAITaskParser` is an optional structured parser for deployments that already have an approved model endpoint (`pip install -e ".[llm]"`); its output is validated against the same `TaskRequest` schema. The deterministic planner remains the local fallback. `LLMPlanner` can propose only a registered, currently available tool, and the executor continues to own preconditions, evidence checks, and escalation.
+`RuleBasedTaskParser` is the offline default. The recommended cloud parser is `DeepSeekTaskParser`, which uses DeepSeek's OpenAI-compatible endpoint and requires only `DEEPSEEK_API_KEY` outside the repository:
+
+```bash
+pip install -e ".[llm]"
+$env:DEEPSEEK_API_KEY = "your-key"  # PowerShell; never commit this value
+python -m industrial_fault_agent.cli ask --parser deepseek --request "分析 data/demo/phase_open_window.csv，如果置信度低于0.8就不要下结论并给出证据" --pretty
+```
+
+Set `FAULT_AGENT_PARSER=deepseek` to make DeepSeek the CLI default after configuring the key. The response is parsed as JSON and validated against the same `TaskRequest` schema before it reaches the Agent. If the key or network is unavailable, use `--parser rules` for the deterministic offline parser. `OpenAITaskParser` remains available for other OpenAI-compatible endpoints. The deterministic planner remains the local fallback. `LLMPlanner` can propose only a registered, currently available tool, and the executor continues to own preconditions, evidence checks, and escalation.
 
 ## Why this is an Agent project
 

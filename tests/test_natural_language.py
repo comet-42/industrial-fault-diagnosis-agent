@@ -2,8 +2,29 @@ import unittest
 
 from industrial_fault_agent.agent import AgentState, LLMPlanner, FaultDiagnosisAgent
 from industrial_fault_agent.models import TaskRequest
-from industrial_fault_agent.natural_language import NaturalLanguageAgent, RuleBasedTaskParser
+from industrial_fault_agent.natural_language import DeepSeekTaskParser, NaturalLanguageAgent, RuleBasedTaskParser
 from industrial_fault_agent.synthetic import generate_signal
+
+
+class _FakeDeepSeek:
+    class _Completions:
+        @staticmethod
+        def create(**kwargs):
+            class Message:
+                content = '{"input_path": null, "focus_fault": "phase_open", "confidence_threshold": 0.8, "require_evidence": true, "output_format": "json"}'
+            class Choice:
+                message = Message()
+            class Response:
+                choices = [Choice()]
+            return Response()
+
+    class _Chat:
+        pass
+
+    chat = _Chat()
+
+
+_FakeDeepSeek.chat.completions = _FakeDeepSeek._Completions()
 
 
 class NaturalLanguageTests(unittest.TestCase):
@@ -36,6 +57,13 @@ class NaturalLanguageTests(unittest.TestCase):
         planner = LLMPlanner(lambda state, tools: {"tool": tools[0]["name"]}, tools=agent.planner.tools)
         choice = planner.choose(AgentState(signal=generate_signal("normal"), task_request=TaskRequest()))
         self.assertEqual(choice[0].name, "inspect_signal")
+
+    def test_deepseek_parser_validates_structured_response(self):
+        parser = DeepSeekTaskParser(client=_FakeDeepSeek())
+        task = parser.parse("分析这段电机数据，置信度低于0.8不要下结论")
+        self.assertEqual(task.focus_fault, "phase_open")
+        self.assertEqual(task.confidence_threshold, 0.8)
+        self.assertTrue(task.require_evidence)
 
 
 if __name__ == "__main__":
