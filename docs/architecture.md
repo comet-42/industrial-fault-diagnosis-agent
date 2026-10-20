@@ -1,4 +1,4 @@
-# Architecture and interview walkthrough
+# Architecture and operational walkthrough
 
 ## Agent state
 
@@ -16,9 +16,9 @@ The workflow state consists of the signal schema check, engineered features, mod
 
 The intended production adapter is the existing PMSM TCN: concatenate the same 15-channel window representation, load the frozen artifact, and map its seven-class/multi-task output to the `run_diagnostic_model` contract. The Agent then adds the missing product layer around that model: tool orchestration, evidence, domain retrieval, refusal, and an evaluation surface.
 
-## Suggested demo script
+## Suggested operational check
 
 1. Run `python -m industrial_fault_agent.cli --fault phase_open --pretty`.
-2. Point out that the report contains five tool calls and evidence rather than only a class label.
-3. Change one input sample to `NaN` and show that the Agent returns `uncertain` and escalates.
-4. Explain how `run_diagnostic_model` can be swapped for ONNX Runtime without changing the orchestration or report schema.
+2. Verify that the report contains five tool calls and evidence rather than only a class label.
+3. Change one input sample to `NaN` and verify that the Agent returns `uncertain` and escalates.
+4. Replace `run_diagnostic_model` with an ONNX Runtime adapter without changing the orchestration or report schema.

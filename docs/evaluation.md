@@ -1,6 +1,6 @@
 # Evaluation protocol
 
-The included harness is a smoke evaluation over five deterministic public cases. It is useful for CI and demos, not for claiming field performance.
+The included harness is a repeatable reference evaluation over five deterministic cases. It is useful for CI and integration checks; it is not a claim of field performance.
 
 For the real PMSM model, keep the following protocol:
 

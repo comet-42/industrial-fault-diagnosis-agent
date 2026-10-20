@@ -1,12 +1,12 @@
 {
   "normal_window.csv": {
     "label": "normal",
-    "source": "synthetic-demo",
+    "source": "reference-synthetic",
     "seed": 7
   },
   "phase_open_window.csv": {
     "label": "phase_open",
-    "source": "synthetic-demo",
+    "source": "reference-synthetic",
     "seed": 7
   }
 }

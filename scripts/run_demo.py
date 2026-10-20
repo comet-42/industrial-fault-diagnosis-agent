@@ -1,4 +1,4 @@
-"""Run the public CSV demo without private model or MATLAB dependencies."""
+"""Run the CSV quickstart without private model or MATLAB dependencies."""
 
 from __future__ import annotations
 
@@ -20,11 +20,11 @@ def load_csv(path: Path) -> SignalRecord:
         raise ValueError(f"CSV must contain columns: {', '.join(CHANNELS)}")
     channels = {channel: [float(row[channel]) for row in rows] for channel in CHANNELS}
     return SignalRecord(sample_rate_hz=2500.0, channels=channels,
-                        metadata={"source": "public-demo-csv", "path": path.name})
+                        metadata={"source": "reference-csv", "path": path.name})
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the public industrial fault Agent demo")
+    parser = argparse.ArgumentParser(description="Run the industrial fault Agent quickstart")
     parser.add_argument("--input", type=Path, required=True, help="CSV with i_a,i_b,i_c columns")
     parser.add_argument("--output", type=Path, help="Optional JSON report path")
     args = parser.parse_args()

@@ -2,7 +2,7 @@
 
 ## Intended use
 
-The project demonstrates an evidence-grounded software Agent around the PA-JC-HMT-TCN multi-task model. Given a valid standardized window, it reports a seven-class fault type, module prediction, severity estimate, evidence, and an engineering action.
+The project provides an evidence-grounded software Agent around the PA-JC-HMT-TCN multi-task model. Given a valid standardized window, it reports a seven-class fault type, module prediction, severity estimate, evidence, and an engineering action.
 
 ## Model and data boundary
 
@@ -18,7 +18,7 @@ The connected artifact is the frozen `TCN_V2` dlnetwork checkpoint. Its reported
 
 ## Confirmed evaluation record
 
-The local v6.2 confirmation summary reports 84 independent runs, three proposed seeds, seven classes, and a run-level seven-class Macro-F1 of 0.9028 for the pressure joint TCN comparator. The summary also reports a positive confirmation decision. These figures are included as provenance for the research model and are not the accuracy of the synthetic public demo.
+The local v6.2 confirmation summary reports 84 independent runs, three proposed seeds, seven classes, and a run-level seven-class Macro-F1 of 0.9028 for the pressure joint TCN comparator. The summary also reports a positive confirmation decision. These figures are included as provenance for the research model and are not the accuracy of the reference input suite.
 
 ## Limitations
 
@@ -29,4 +29,4 @@ The local v6.2 confirmation summary reports 84 independent runs, three proposed 
 
 ## Reproducibility
 
-Keep the `.mat` checkpoint and private data outside Git. Record its SHA-256, MATLAB release, `spec` structure, preprocessing version, and seed when publishing a run. The public repository contains a MATLAB bridge, a Python adapter, synthetic CSVs, and contract tests.
+Keep the `.mat` checkpoint and private data outside Git. Record its SHA-256, MATLAB release, `spec` structure, preprocessing version, and seed when publishing a run. The repository contains a MATLAB bridge, a Python adapter, reference CSVs, and contract tests.

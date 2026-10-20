@@ -1,7 +1,7 @@
-"""Public, deterministic synthetic data for demos and tests.
+"""Deterministic reference data for quickstarts and tests.
 
 The generator intentionally produces no private research data. Its signatures are
-simple approximations that let the agent demonstrate tool use and evaluation.
+simple approximations that let the agent exercise tool use and evaluation.
 """
 
 from __future__ import annotations
@@ -38,4 +38,4 @@ def generate_signal(fault: str = "normal", *, seed: int = 7, sample_rate_hz: flo
     elif fault == "sensor_bias":
         phases["i_c"] = (np.asarray(phases["i_c"]) + 2.0).tolist()
     return SignalRecord(sample_rate_hz=sample_rate_hz, channels=phases,
-                        metadata={"fault_label": fault, "source": "synthetic-demo", "seed": seed})
+                        metadata={"fault_label": fault, "source": "reference-synthetic", "seed": seed})

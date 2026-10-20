@@ -12,11 +12,11 @@ flowchart LR
   F --> G[Evidence-grounded report]
 ```
 
-The public demo uses deterministic synthetic signals, so the repository runs without private research data, an API key, or a hosted model. The transparent classifier is deliberately an adapter seam. An optional ONNX classifier adapter is included; private artifacts stay outside Git.
+The quickstart uses deterministic synthetic signals, so the repository runs without private research data, an API key, or a hosted model. The transparent classifier is deliberately an adapter seam. An optional ONNX classifier adapter is included; private artifacts stay outside Git.
 
 ## Why this is an Agent project
 
-The system is more than a classifier. It executes a stateful task with typed tools, chooses the next step from the current result, records a complete trace, retrieves domain knowledge, and refuses to issue a confident diagnosis when quality gates fail. This makes tool selection, evidence grounding, uncertainty handling, and evaluation visible in a code review or interview demo.
+The system is more than a classifier. It executes a stateful task with typed tools, chooses the next step from the current result, records a complete trace, retrieves domain knowledge, and refuses to issue a confident diagnosis when quality gates fail. These controls make the service auditable and suitable for integration into an engineering monitoring workflow.
 
 ## Quick start
 
@@ -67,7 +67,7 @@ An optional ONNX inference adapter is available in `src/industrial_fault_agent/o
 
 ## Evaluation
 
-`python -m industrial_fault_agent.evaluate` runs one reproducible case per public fault family and reports accuracy, confidence, and tool-call count. For a serious model comparison, add grouped splits by complete operating condition, report macro-F1, calibration, latency, and failure/escalation rate. Do not use overlapping windows across train and test sets.
+`python -m industrial_fault_agent.evaluate` runs one reproducible case per reference fault family and reports accuracy, confidence, and tool-call count. For a serious model comparison, add grouped splits by complete operating condition, report macro-F1, calibration, latency, and failure/escalation rate. Do not use overlapping windows across train and test sets.
 
 ## Repository map
 
@@ -75,10 +75,10 @@ An optional ONNX inference adapter is available in `src/industrial_fault_agent/o
 |---|---|
 | `src/industrial_fault_agent/agent.py` | Orchestration and evidence report |
 | `src/industrial_fault_agent/tools.py` | Typed diagnostic tools and quality gate |
-| `src/industrial_fault_agent/synthetic.py` | Reproducible public demo data |
+| `src/industrial_fault_agent/synthetic.py` | Reproducible reference data generator |
 | `src/industrial_fault_agent/evaluate.py` | Offline evaluation harness |
-| `scripts/run_demo.py` | Public CSV demo entry point |
-| `data/demo/` | Deterministic synthetic inputs safe to publish |
+| `scripts/run_demo.py` | CSV quickstart entry point |
+| `data/demo/` | Deterministic reference inputs |
 | `matlab/` | PA-JC-HMT-TCN MATLAB inference bridge |
 | `docs/model_card.md` | Data, use, and limitation statement |
 | `.github/workflows/test.yml` | Reproducible CI checks |
@@ -86,10 +86,10 @@ An optional ONNX inference adapter is available in `src/industrial_fault_agent/o
 
 ## Limitations and safe use
 
-This demo is an engineering prototype, not a safety-certified protection system. Synthetic signatures are intentionally simple. A production deployment must validate against held-out machine data, include operating-condition coverage, monitor drift, and keep a qualified engineer in the decision loop.
+This release is an engineering prototype, not a safety-certified protection system. Reference signatures are intentionally simple. A production deployment must validate against held-out machine data, include operating-condition coverage, monitor drift, and keep a qualified engineer in the decision loop.
 
 ## Roadmap
 
 1. Add a local document retriever for manuals and experiment notes with source citations.
 2. Add an optional LangGraph/OpenAI planner while retaining the deterministic offline path.
-3. Add latency, calibration, grouped cross-condition evaluation, and a small web demo.
+3. Add latency, calibration, grouped cross-condition evaluation, and a small web service.
