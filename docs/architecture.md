@@ -10,7 +10,7 @@ The Agent state contains the task goal, observations, uncertainty, tool traces, 
 - A model label is not exposed as a diagnosis until the validation tool approves it.
 - Every report cites the signal inspection, feature values, model output, and knowledge entry as evidence.
 - Uncertainty is represented explicitly as `fault_family="uncertain"` with an escalation action.
-- The policy is deterministic and fully offline, so it is reproducible. A future LLM planner can propose actions through the same tool contract, but it cannot directly write a report or bypass the quality gate.
+- The default policy is deterministic and fully offline, so it is reproducible. An optional LLM planner can propose actions through the same tool contract, but it cannot directly write a report or bypass the quality gate. A natural-language parser turns an operator request into a typed `TaskRequest` before the loop starts; language parsing and tool execution remain separate concerns.
 
 ## Dynamic paths
 

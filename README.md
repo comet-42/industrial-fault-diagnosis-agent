@@ -24,6 +24,18 @@ flowchart TD
 
 The quickstart uses deterministic synthetic signals, so the repository runs without private research data, an API key, or a hosted model. The transparent classifier is deliberately an adapter seam. An optional ONNX classifier adapter is included; private artifacts stay outside Git.
 
+## Natural-language requests
+
+The runtime now accepts an operator request in Chinese or English and normalizes it into a typed `TaskRequest`. The request can name a CSV, set a confidence threshold, ask for evidence, and focus on a fault family. The language layer only selects task parameters; it cannot invoke arbitrary tools or bypass the existing validation gate.
+
+```bash
+python -m industrial_fault_agent.cli ask \
+  --request "分析 data/demo/phase_open_window.csv，如果置信度低于0.8就不要下结论并给出证据" \
+  --pretty
+```
+
+`RuleBasedTaskParser` is the offline default. `OpenAITaskParser` is an optional structured parser for deployments that already have an approved model endpoint (`pip install -e ".[llm]"`); its output is validated against the same `TaskRequest` schema. The deterministic planner remains the local fallback. `LLMPlanner` can propose only a registered, currently available tool, and the executor continues to own preconditions, evidence checks, and escalation.
+
 ## Why this is an Agent project
 
 The system is more than a classifier. It executes a goal-driven state/action loop with a tool registry. At each step the planner scores applicable tools from the current state, chooses one action, observes the result, and replans. A normal case skips targeted analysis; sensor-bias and interturn candidates trigger different evidence tools. The Agent records its decisions, retrieves domain knowledge, and refuses to issue a confident diagnosis when quality gates fail.
@@ -84,6 +96,7 @@ An optional ONNX inference adapter is available in `src/industrial_fault_agent/o
 | Path | Purpose |
 |---|---|
 | `src/industrial_fault_agent/agent.py` | Orchestration and evidence report |
+| `src/industrial_fault_agent/natural_language.py` | Natural-language task parsing, CSV loading, and request runner |
 | `src/industrial_fault_agent/tools.py` | Typed diagnostic tools and quality gate |
 | `src/industrial_fault_agent/synthetic.py` | Reproducible reference data generator |
 | `src/industrial_fault_agent/evaluate.py` | Offline evaluation harness |
@@ -101,5 +114,4 @@ This release is an engineering prototype, not a safety-certified protection syst
 ## Roadmap
 
 1. Add a local document retriever for manuals and experiment notes with source citations.
-2. Add an optional LangGraph/OpenAI planner behind the same `GoalDirectedPlanner` contract while retaining the deterministic policy as a safe fallback.
-3. Add latency, calibration, grouped cross-condition evaluation, and a small web service.
+2. Add latency, calibration, grouped cross-condition evaluation, and a small web service.

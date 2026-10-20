@@ -82,33 +82,45 @@ def retrieve_knowledge(label: str) -> Tuple[Dict[str, Any], ToolTrace]:
                        {"label": label}, {"source": out["source"]})
 
 
-def validate_diagnosis(label: str, confidence: float, inspection: Dict[str, Any], features: Dict[str, Any]) -> Tuple[Dict[str, Any], ToolTrace]:
+def validate_diagnosis(label: str, confidence: float, inspection: Dict[str, Any], features: Dict[str, Any],
+                       *, confidence_threshold: float = 0.60,
+                       requested_fault: str | None = None,
+                       evidence_checked: bool = True) -> Tuple[Dict[str, Any], ToolTrace]:
     reasons: List[str] = []
-    valid = bool(inspection["finite"] and inspection["n_samples"] >= 100 and confidence >= 0.60)
+    valid = bool(inspection["finite"] and inspection["n_samples"] >= 100 and confidence >= confidence_threshold)
     if not inspection["finite"]:
         reasons.append("non-finite input")
     if inspection["n_samples"] < 100:
         reasons.append("window shorter than 100 samples")
-    if confidence < 0.60:
-        reasons.append("model confidence below threshold")
+    if confidence < confidence_threshold:
+        reasons.append(f"model confidence below requested threshold ({confidence_threshold:.2f})")
+    if requested_fault and label != requested_fault:
+        valid = False
+        reasons.append(f"prediction does not match requested fault ({requested_fault})")
+    if not evidence_checked:
+        valid = False
+        reasons.append("requested evidence check was not completed")
     if label == "phase_open" and features.get("i_b", {}).get("rms", 1.0) >= 1.0:
         valid = False
         reasons.append("phase-open rule not supported by channel RMS")
     out = {"valid": valid, "reasons": reasons or ["all quality gates passed"],
            "escalate": not valid}
     return out, _trace("validate_diagnosis", "Reject unsupported conclusions and trigger escalation.",
-                       {"label": label, "confidence": confidence}, out)
+                       {"label": label, "confidence": confidence,
+                        "confidence_threshold": confidence_threshold,
+                        "requested_fault": requested_fault}, out)
 
 
-def assess_uncertainty(prediction: Dict[str, Any]) -> Tuple[Dict[str, Any], ToolTrace]:
+def assess_uncertainty(prediction: Dict[str, Any], *, confidence_threshold: float = 0.60) -> Tuple[Dict[str, Any], ToolTrace]:
     """Decide whether the planner needs an uncertainty gate before reporting."""
     probabilities = prediction.get("class_probabilities", {})
     values = sorted((float(value) for value in probabilities.values()), reverse=True)
     margin = values[0] - values[1] if len(values) > 1 else float(prediction.get("confidence", 0.0))
     confidence = float(prediction.get("confidence", 0.0))
-    requires_escalation = confidence < 0.60 or margin < 0.10
+    requires_escalation = confidence < confidence_threshold or margin < 0.10
     out = {"confidence": confidence, "top_two_margin": margin,
            "requires_escalation": requires_escalation,
+           "confidence_threshold": confidence_threshold,
            "reason": "low confidence or ambiguous top classes" if requires_escalation else "confidence gate passed"}
     return out, _trace("assess_uncertainty", "Check whether the prediction is decisive enough to continue.",
                        {"label": prediction.get("label"), "confidence": confidence}, out)

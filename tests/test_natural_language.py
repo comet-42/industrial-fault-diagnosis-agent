@@ -1,0 +1,42 @@
+import unittest
+
+from industrial_fault_agent.agent import AgentState, LLMPlanner, FaultDiagnosisAgent
+from industrial_fault_agent.models import TaskRequest
+from industrial_fault_agent.natural_language import NaturalLanguageAgent, RuleBasedTaskParser
+from industrial_fault_agent.synthetic import generate_signal
+
+
+class NaturalLanguageTests(unittest.TestCase):
+    def test_chinese_request_becomes_typed_task(self):
+        task = RuleBasedTaskParser().parse(
+            "分析 data/demo/phase_open_window.csv，如果置信度低于0.8就不要下结论并给出证据"
+        )
+        self.assertEqual(task.input_path, "data/demo/phase_open_window.csv")
+        self.assertEqual(task.focus_fault, "phase_open")
+        self.assertEqual(task.confidence_threshold, 0.8)
+        self.assertTrue(task.require_evidence)
+
+    def test_natural_language_request_changes_confidence_gate(self):
+        task, report = NaturalLanguageAgent().ask(
+            "分析这段电机数据，如果置信度低于0.8就不要下结论",
+            signal=generate_signal("normal"),
+        )
+        self.assertEqual(task.confidence_threshold, 0.8)
+        self.assertEqual(report.fault_family, "uncertain")
+        self.assertTrue(report.uncertainty)
+
+    def test_llm_planner_rejects_unregistered_tool(self):
+        agent = FaultDiagnosisAgent()
+        planner = LLMPlanner(lambda state, tools: {"tool": "delete_everything"}, tools=agent.planner.tools)
+        with self.assertRaises(ValueError):
+            planner.choose(AgentState(signal=generate_signal("normal"), task_request=TaskRequest()))
+
+    def test_llm_planner_can_choose_available_registered_tool(self):
+        agent = FaultDiagnosisAgent()
+        planner = LLMPlanner(lambda state, tools: {"tool": tools[0]["name"]}, tools=agent.planner.tools)
+        choice = planner.choose(AgentState(signal=generate_signal("normal"), task_request=TaskRequest()))
+        self.assertEqual(choice[0].name, "inspect_signal")
+
+
+if __name__ == "__main__":
+    unittest.main()

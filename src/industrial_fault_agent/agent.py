@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
-from .models import AgentDecision, DiagnosisReport, Evidence, SignalRecord, ToolTrace
+from .models import AgentDecision, DiagnosisReport, Evidence, SignalRecord, TaskRequest, ToolTrace
 from .tools import (analyze_fault_evidence, assess_uncertainty, extract_features,
                     analyze_pa_jc_evidence, inspect_signal, retrieve_knowledge,
                     run_diagnostic_model, validate_diagnosis)
@@ -18,6 +18,7 @@ class AgentState:
     """Mutable state shared by the planner and tools during one task."""
 
     signal: SignalRecord
+    task_request: TaskRequest = field(default_factory=TaskRequest)
     goal: str = "produce a reliable, evidence-grounded diagnosis"
     observations: Dict[str, Any] = field(default_factory=dict)
     tool_trace: List[ToolTrace] = field(default_factory=list)
@@ -57,6 +58,35 @@ class GoalDirectedPlanner:
         return next(tool for tool in self.tools if tool.name == name), candidates
 
 
+class LLMPlanner(GoalDirectedPlanner):
+    """Constrained planner adapter for an LLM or another policy service.
+
+    ``decision_fn`` receives the current state and a JSON-like tool catalog and
+    must return ``{"tool": "registered_name", "rationale": "..."}``. The
+    executor still owns availability checks and the tool registry, so a model
+    cannot invoke arbitrary Python functions or skip validation gates.
+    """
+
+    def __init__(self, decision_fn: Callable[[AgentState, List[Dict[str, Any]]], Dict[str, Any]],
+                 tools: Optional[List[ToolSpec]] = None):
+        super().__init__(tools or FaultDiagnosisAgent._tool_specs(FaultDiagnosisAgent.__new__(FaultDiagnosisAgent)))
+        self.decision_fn = decision_fn
+
+    def choose(self, state: AgentState) -> Optional[tuple[ToolSpec, Dict[str, float]]]:
+        available = [tool for tool in self.tools if tool.available(state)]
+        if not available:
+            return None
+        catalog = [{"name": tool.name, "purpose": tool.purpose} for tool in available]
+        decision = self.decision_fn(state, catalog)
+        if not isinstance(decision, dict) or not isinstance(decision.get("tool"), str):
+            raise ValueError("LLM planner must return an object with a tool name")
+        selected = next((tool for tool in available if tool.name == decision["tool"]), None)
+        if selected is None:
+            raise ValueError(f"planner selected unavailable or unknown tool: {decision['tool']}")
+        scores = {tool.name: (1.0 if tool is selected else 0.0) for tool in available}
+        return selected, scores
+
+
 class FaultDiagnosisAgent:
     """Goal-driven industrial diagnosis Agent with a state/action loop."""
 
@@ -66,10 +96,18 @@ class FaultDiagnosisAgent:
         self.max_steps = max_steps
         self.planner = planner or GoalDirectedPlanner(self._tool_specs())
 
-    def diagnose(self, signal: SignalRecord, *, run_id: Optional[str] = None) -> DiagnosisReport:
-        state = AgentState(signal=signal)
+    def diagnose(self, signal: SignalRecord, *, run_id: Optional[str] = None,
+                 task_request: Optional[TaskRequest] = None) -> DiagnosisReport:
+        request = task_request or TaskRequest()
+        state = AgentState(signal=signal, task_request=request,
+                           goal=request.intent or "produce a reliable, evidence-grounded diagnosis")
         while state.status == "running" and state.step_count < self.max_steps:
-            choice = self.planner.choose(state)
+            try:
+                choice = self.planner.choose(state)
+            except Exception as exc:
+                state.status = "escalated"
+                state.uncertainty.append(f"planner failed safely: {exc}")
+                break
             if choice is None:
                 state.status = "escalated"
                 state.uncertainty.append("no applicable tool can advance the task")
@@ -92,8 +130,10 @@ class FaultDiagnosisAgent:
             state.uncertainty.append("maximum Agent steps reached")
         return self._make_report(state, run_id=run_id or self._run_id(signal))
 
-    def diagnose_pa_jc(self, window, adapter, *, run_id: Optional[str] = None) -> DiagnosisReport:
+    def diagnose_pa_jc(self, window, adapter, *, run_id: Optional[str] = None,
+                       task_request: Optional[TaskRequest] = None) -> DiagnosisReport:
         """Run the real PA-JC model through a goal-driven decision path."""
+        request = task_request or TaskRequest()
         value = np.asarray(window)
         if value.shape != (15, 500):
             raise ValueError(f"PA-JC-HMT-TCN expects a standardized 15x500 window, got {value.shape}")
@@ -103,11 +143,11 @@ class FaultDiagnosisAgent:
         traces = [ToolTrace("pa_jc_hmt_tcn", "Run the frozen PA-JC-HMT-TCN multi-task model.",
                             {"shape": list(value.shape), "model": result.get("model_name", "unknown")},
                             {"fault": result["fault_name"], "module": result["module_name"], "severity": result["severity"]})]
-        if confidence < 0.75:
+        if confidence < max(0.75, request.confidence_threshold) or request.require_evidence:
             uncertainty, uncertainty_trace = assess_uncertainty({
                 "label": result["fault_name"], "confidence": confidence,
                 "class_probabilities": dict(enumerate(result.get("fault_scores", []))),
-            })
+            }, confidence_threshold=request.confidence_threshold)
             decisions.append(AgentDecision(2, "assess_uncertainty", uncertainty_trace.purpose, {"assess_uncertainty": 90.0, "retrieve_knowledge": 70.0}))
             traces.append(uncertainty_trace)
         label_map = {"Normal": "normal", "OpenCircuit": "phase_open", "GroundUnbalance": "ground_unbalance",
@@ -120,8 +160,14 @@ class FaultDiagnosisAgent:
         knowledge, knowledge_trace = retrieve_knowledge(label)
         traces.append(knowledge_trace)
         decisions.append(AgentDecision(len(decisions) + 1, "retrieve_knowledge", knowledge_trace.purpose, {"retrieve_knowledge": 70.0, "validate_diagnosis": 60.0}))
-        valid = confidence >= 0.60
-        reasons = ["model confidence below threshold"] if not valid else ["all quality gates passed"]
+        valid = confidence >= request.confidence_threshold
+        reasons = [f"model confidence below requested threshold ({request.confidence_threshold:.2f})"] if not valid else ["all quality gates passed"]
+        if request.focus_fault and label != request.focus_fault:
+            valid = False
+            reasons.append(f"prediction does not match requested fault ({request.focus_fault})")
+        if request.require_evidence and label in self.TARGETED_LABELS and not any(trace.tool == "analyze_pa_jc_evidence" for trace in traces):
+            valid = False
+            reasons.append("requested evidence check was not completed")
         validation = {"valid": valid, "reasons": reasons, "escalate": not valid}
         validation_trace = ToolTrace("validate_diagnosis", "Reject unsupported conclusions and trigger escalation.", {"label": label, "confidence": confidence}, validation)
         traces.append(validation_trace)
@@ -143,10 +189,10 @@ class FaultDiagnosisAgent:
             ToolSpec("inspect_signal", "Check input schema and finite values.", lambda s: "inspect_signal" not in s.observations, lambda s: 100.0, lambda s: inspect_signal(s.signal)),
             ToolSpec("extract_features", "Compute interpretable signal descriptors.", lambda s: bool(s.observations.get("inspect_signal", {}).get("finite")) and "extract_features" not in s.observations, lambda s: 90.0, lambda s: extract_features(s.signal)),
             ToolSpec("run_diagnostic_model", "Infer candidate faults from current evidence.", lambda s: "extract_features" in s.observations and "run_diagnostic_model" not in s.observations, lambda s: 80.0, lambda s: run_diagnostic_model(s.observations["extract_features"])),
-            ToolSpec("assess_uncertainty", "Gate ambiguous predictions before reporting.", lambda s: "run_diagnostic_model" in s.observations and "assess_uncertainty" not in s.observations and float(predicted(s).get("confidence", 0.0)) < 0.75, lambda s: 88.0, lambda s: assess_uncertainty(predicted(s))),
+            ToolSpec("assess_uncertainty", "Gate ambiguous predictions before reporting.", lambda s: "run_diagnostic_model" in s.observations and "assess_uncertainty" not in s.observations and (float(predicted(s).get("confidence", 0.0)) < max(0.75, s.task_request.confidence_threshold) or s.task_request.require_evidence), lambda s: 88.0, lambda s: assess_uncertainty(predicted(s), confidence_threshold=s.task_request.confidence_threshold)),
             ToolSpec("analyze_fault_evidence", "Run targeted evidence analysis for the predicted fault.", lambda s: "run_diagnostic_model" in s.observations and "extract_features" in s.observations and label_is_targeted(s) and "analyze_fault_evidence" not in s.observations, lambda s: 86.0, lambda s: analyze_fault_evidence(predicted(s)["label"], s.observations["extract_features"])),
             ToolSpec("retrieve_knowledge", "Ground the candidate in an engineering action.", lambda s: "run_diagnostic_model" in s.observations and "retrieve_knowledge" not in s.observations and (not label_is_targeted(s) or "analyze_fault_evidence" in s.observations), lambda s: 70.0, lambda s: retrieve_knowledge(predicted(s)["label"])),
-            ToolSpec("validate_diagnosis", "Reject unsupported conclusions and trigger escalation.", lambda s: "run_diagnostic_model" in s.observations and "retrieve_knowledge" in s.observations and "validate_diagnosis" not in s.observations and ("assess_uncertainty" not in s.observations or not s.observations["assess_uncertainty"].get("requires_escalation")), lambda s: 60.0, lambda s: validate_diagnosis(predicted(s)["label"], predicted(s)["confidence"], s.observations["inspect_signal"], s.observations["extract_features"])),
+            ToolSpec("validate_diagnosis", "Reject unsupported conclusions and trigger escalation.", lambda s: "run_diagnostic_model" in s.observations and "retrieve_knowledge" in s.observations and "validate_diagnosis" not in s.observations and ("assess_uncertainty" not in s.observations or not s.observations["assess_uncertainty"].get("requires_escalation")), lambda s: 60.0, lambda s: validate_diagnosis(predicted(s)["label"], predicted(s)["confidence"], s.observations["inspect_signal"], s.observations["extract_features"], confidence_threshold=s.task_request.confidence_threshold, requested_fault=s.task_request.focus_fault, evidence_checked=(not s.task_request.require_evidence or predicted(s).get("label") not in self.TARGETED_LABELS or "analyze_fault_evidence" in s.observations))),
         ]
 
     @staticmethod

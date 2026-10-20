@@ -21,6 +21,31 @@ class SignalRecord:
 
 
 @dataclass
+class TaskRequest:
+    """Normalized intent extracted from a natural-language request.
+
+    The diagnosis runtime consumes this typed object instead of interpreting
+    free text inside tools.  This keeps language parsing replaceable while
+    making safety-relevant requirements auditable in the report.
+    """
+
+    intent: str = "diagnose_signal"
+    input_path: Optional[str] = None
+    focus_fault: Optional[str] = None
+    confidence_threshold: float = 0.60
+    require_evidence: bool = False
+    output_format: str = "json"
+    original_request: str = ""
+
+    def __post_init__(self) -> None:
+        self.confidence_threshold = float(self.confidence_threshold)
+        if not 0.0 <= self.confidence_threshold <= 1.0:
+            raise ValueError("confidence_threshold must be between 0 and 1")
+        if self.output_format not in {"json", "text"}:
+            raise ValueError("output_format must be 'json' or 'text'")
+
+
+@dataclass
 class ToolTrace:
     tool: str
     purpose: str

@@ -8,7 +8,7 @@ AgentState -> Planner -> ToolExecutor -> Observation -> AgentState
 
 `AgentState` stores the task goal, observations, uncertainty, tool traces, decision traces, and status. `ToolSpec` describes a tool's precondition, utility score, and handler. `GoalDirectedPlanner` evaluates all currently applicable tools and selects the highest-scoring action. The loop stops when validation succeeds, no tool can advance the task, a tool fails, or the action budget is exhausted.
 
-The policy is deterministic by design. This provides reproducible industrial behavior while preserving the same interface for a future LLM planner. An LLM may propose a tool action, but the executor should still enforce tool schemas, preconditions, timeouts, and validation gates.
+The default policy is deterministic by design. This provides reproducible industrial behavior while preserving the same interface for `LLMPlanner`. An LLM may propose a tool action, but the executor still enforces the registered-tool allowlist, preconditions, timeouts, and validation gates. Natural-language requests are parsed into a typed `TaskRequest` before planning; they do not become executable code.
 
 The important distinction from a fixed script is the decision path. A normal request does not run targeted fault analysis. A sensor-bias or interturn candidate activates a different evidence tool. An ambiguous prediction activates an uncertainty gate. The decision trace records the candidate tools and selected action at each step, so the path can be inspected after the run.
 
