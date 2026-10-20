@@ -52,6 +52,7 @@ class ToolTrace:
     input_summary: Dict[str, Any]
     output_summary: Dict[str, Any]
     status: str = "ok"
+    duration_ms: float = 0.0
 
 
 @dataclass
@@ -62,6 +63,7 @@ class AgentDecision:
     chosen_tool: str
     rationale: str
     candidate_scores: Dict[str, float] = field(default_factory=dict)
+    available_tools: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -84,6 +86,7 @@ class DiagnosisReport:
     decision_trace: List[AgentDecision] = field(default_factory=list)
     uncertainty: List[str] = field(default_factory=list)
     run_id: Optional[str] = None
+    duration_ms: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

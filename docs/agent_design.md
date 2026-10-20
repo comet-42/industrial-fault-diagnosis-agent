@@ -13,3 +13,9 @@ The default policy is deterministic by design. This provides reproducible indust
 The important distinction from a fixed script is the decision path. A normal request does not run targeted fault analysis. A sensor-bias or interturn candidate activates a different evidence tool. An ambiguous prediction activates an uncertainty gate. The decision trace records the candidate tools and selected action at each step, so the path can be inspected after the run.
 
 The current policy is intentionally small and safe. Production expansion should add bounded evidence collection, adjacent-window acquisition, model fallback, human approval nodes, persistent task state, and metrics for tool success, escalation, latency, and calibration.
+
+## Tool contract and observability
+
+Each registered `ToolSpec` exposes a machine-readable schema containing its name, purpose, input schema, and output schema. `LLMPlanner` receives only the currently available catalog and the executor rejects unknown or unavailable tool names. Every invocation records status and duration in `ToolTrace`; every choice records candidate scores and the available-tool set in `AgentDecision`. This makes the decision path inspectable instead of hiding planning inside a prompt.
+
+The optional HTTP demo exposes health and in-process counters. The manifest evaluator is the path for real labeled data: it measures accuracy, confusion, escalation rate, and latency while keeping the data local.

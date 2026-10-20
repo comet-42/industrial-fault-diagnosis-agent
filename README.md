@@ -52,6 +52,34 @@ python scripts/configure_model.py
 
 The script offers `deepseek-chat` and `deepseek-reasoner`, hides API-key input, and writes only to the Git-ignored `.env` file. It does not validate or transmit the key; the first real request performs the provider call.
 
+## Local HTTP demo and observability
+
+Install the optional API dependencies and start a local service:
+
+```bash
+pip install -e ".[api]"
+python scripts/serve_demo.py --port 8000
+```
+
+The service exposes `GET /health`, `GET /metrics`, and `POST /diagnose`. The request body contains a natural-language `request` and an inline signal object with `sample_rate_hz` and `channels`. The response includes the normalized task, diagnosis, evidence, planner decisions, available-tool candidates, per-tool duration, and escalation state. `/metrics` is intentionally small and in-process for the demo; production deployment should export metrics to the team's monitoring system. The API demo currently uses the local deterministic parser; a production service can inject `DeepSeekTaskParser` after configuring its secret outside the repository.
+
+For labeled private data, create a manifest with `path,label,sample_rate_hz` and run:
+
+```bash
+python scripts/evaluate_manifest.py --manifest data/private/manifest.csv
+```
+
+The evaluator reports accuracy, confusion counts, escalation rate, and latency without requiring private files to be committed. The public `data/demo` files remain quickstart reference inputs and are not evidence of field performance.
+
+Example manifest row:
+
+```csv
+path,label,sample_rate_hz
+C:/lab/heldout/window_0001.csv,phase_open,10000
+```
+
+Use grouped, held-out operating conditions for a meaningful result. Report macro-F1, calibration, latency percentiles, and escalation rate alongside accuracy; do not claim field performance from the five synthetic reference cases.
+
 ## Why this is an Agent project
 
 The system is more than a classifier. It executes a goal-driven state/action loop with a tool registry. At each step the planner scores applicable tools from the current state, chooses one action, observes the result, and replans. A normal case skips targeted analysis; sensor-bias and interturn candidates trigger different evidence tools. The Agent records its decisions, retrieves domain knowledge, and refuses to issue a confident diagnosis when quality gates fail.

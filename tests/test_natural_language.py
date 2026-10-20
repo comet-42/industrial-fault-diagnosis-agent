@@ -57,9 +57,10 @@ class NaturalLanguageTests(unittest.TestCase):
 
     def test_llm_planner_can_choose_available_registered_tool(self):
         agent = FaultDiagnosisAgent()
-        planner = LLMPlanner(lambda state, tools: {"tool": tools[0]["name"]}, tools=agent.planner.tools)
+        planner = LLMPlanner(lambda state, tools: {"tool": tools[0]["name"], "rationale": "input quality must be checked first"}, tools=agent.planner.tools)
         choice = planner.choose(AgentState(signal=generate_signal("normal"), task_request=TaskRequest()))
         self.assertEqual(choice[0].name, "inspect_signal")
+        self.assertEqual(planner.last_rationale, "input quality must be checked first")
 
     def test_deepseek_parser_validates_structured_response(self):
         parser = DeepSeekTaskParser(client=_FakeDeepSeek())
@@ -78,6 +79,15 @@ class NaturalLanguageTests(unittest.TestCase):
             self.assertIn('DEEPSEEK_API_KEY="sk-test#value\\"x"', text)
             values = load_local_env(path)
             self.assertEqual(values["DEEPSEEK_MODEL"], "deepseek-chat")
+
+    def test_tool_catalog_is_machine_readable_and_trace_has_latency(self):
+        agent = FaultDiagnosisAgent()
+        catalog = agent.planner.tool_catalog()
+        self.assertTrue(all({"name", "description", "input_schema", "output_schema"} <= set(item) for item in catalog))
+        report = agent.diagnose(generate_signal("sensor_bias"))
+        self.assertTrue(all(item.duration_ms >= 0 for item in report.tool_trace))
+        self.assertGreaterEqual(report.duration_ms, 0)
+        self.assertTrue(report.decision_trace[0].available_tools)
 
 
 if __name__ == "__main__":
