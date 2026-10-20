@@ -1,0 +1,119 @@
+{
+  "diagnosis": "One phase current is near zero, consistent with an open-phase condition.",
+  "fault_family": "phase_open",
+  "severity": 0.9,
+  "confidence": 0.97,
+  "recommended_action": "Stop or derate safely; inspect phase wiring and inverter protection.",
+  "evidence": [
+    {
+      "source": "signal_inspection",
+      "claim": "input window is finite",
+      "value": true,
+      "confidence": 1.0
+    },
+    {
+      "source": "feature_extractor",
+      "claim": "channel RMS",
+      "value": {
+        "i_a": 5.6771,
+        "i_b": 0.0398,
+        "i_c": 5.6808
+      },
+      "confidence": 0.95
+    },
+    {
+      "source": "diagnostic_model",
+      "claim": "predicted class",
+      "value": "phase_open",
+      "confidence": 0.97
+    },
+    {
+      "source": "pmsm-fault-kb-v1",
+      "claim": "engineering interpretation",
+      "value": "One phase current is near zero, consistent with an open-phase condition.",
+      "confidence": 0.9
+    }
+  ],
+  "tool_trace": [
+    {
+      "tool": "inspect_signal",
+      "purpose": "Check schema, sampling and missing values before analysis.",
+      "input_summary": {
+        "n_channels": 3
+      },
+      "output_summary": {
+        "channels": [
+          "i_a",
+          "i_b",
+          "i_c"
+        ],
+        "n_samples": 500,
+        "sample_rate_hz": 2500.0,
+        "lengths": {
+          "i_a": 500,
+          "i_b": 500,
+          "i_c": 500
+        },
+        "finite": true,
+        "duration_s": 0.2
+      },
+      "status": "ok"
+    },
+    {
+      "tool": "extract_features",
+      "purpose": "Compute interpretable time/frequency descriptors.",
+      "input_summary": {
+        "channels": [
+          "i_a",
+          "i_b",
+          "i_c"
+        ]
+      },
+      "output_summary": {
+        "feature_count": 19
+      },
+      "status": "ok"
+    },
+    {
+      "tool": "run_diagnostic_model",
+      "purpose": "Infer fault class from engineered descriptors.",
+      "input_summary": {
+        "feature_count": 4
+      },
+      "output_summary": {
+        "label": "phase_open",
+        "confidence": 0.97
+      },
+      "status": "ok"
+    },
+    {
+      "tool": "retrieve_knowledge",
+      "purpose": "Ground the model label in an actionable engineering note.",
+      "input_summary": {
+        "label": "phase_open"
+      },
+      "output_summary": {
+        "source": "pmsm-fault-kb-v1"
+      },
+      "status": "ok"
+    },
+    {
+      "tool": "validate_diagnosis",
+      "purpose": "Reject unsupported conclusions and trigger escalation.",
+      "input_summary": {
+        "label": "phase_open",
+        "confidence": 0.97
+      },
+      "output_summary": {
+        "valid": true,
+        "reasons": [
+          "all quality gates passed"
+        ],
+        "escalate": false
+      },
+      "status": "ok"
+    }
+  ],
+  "uncertainty": [],
+  "run_id": "6673b84b8a38"
+}

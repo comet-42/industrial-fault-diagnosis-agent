@@ -27,6 +27,7 @@ pip install -e .
 python -m industrial_fault_agent.cli --fault phase_open --pretty
 python -m industrial_fault_agent.evaluate
 python -m unittest discover -s tests -v
+python scripts/run_demo.py --input data/demo/phase_open_window.csv --output reports/demo_phase_open.json
 ```
 
 Example output includes `fault_family`, `confidence`, `severity`, `evidence`, `recommended_action`, and five `tool_trace` entries. The CLI accepts `normal`, `phase_open`, `interturn_short`, `demagnetization`, and `sensor_bias`.
@@ -76,6 +77,11 @@ An optional ONNX inference adapter is available in `src/industrial_fault_agent/o
 | `src/industrial_fault_agent/tools.py` | Typed diagnostic tools and quality gate |
 | `src/industrial_fault_agent/synthetic.py` | Reproducible public demo data |
 | `src/industrial_fault_agent/evaluate.py` | Offline evaluation harness |
+| `scripts/run_demo.py` | Public CSV demo entry point |
+| `data/demo/` | Deterministic synthetic inputs safe to publish |
+| `matlab/` | PA-JC-HMT-TCN MATLAB inference bridge |
+| `docs/model_card.md` | Data, use, and limitation statement |
+| `.github/workflows/test.yml` | Reproducible CI checks |
 | `tests/` | Regression tests for accuracy, traceability, and refusal behavior |
 
 ## Limitations and safe use
@@ -84,7 +90,6 @@ This demo is an engineering prototype, not a safety-certified protection system.
 
 ## Roadmap
 
-1. Add an ONNX Runtime adapter for the frozen PMSM TCN.
-2. Add a local document retriever for manuals and experiment notes with source citations.
-3. Add an optional LangGraph/OpenAI planner while retaining the deterministic offline path.
-4. Add latency, calibration, grouped cross-condition evaluation, and a small web demo.
+1. Add a local document retriever for manuals and experiment notes with source citations.
+2. Add an optional LangGraph/OpenAI planner while retaining the deterministic offline path.
+3. Add latency, calibration, grouped cross-condition evaluation, and a small web demo.

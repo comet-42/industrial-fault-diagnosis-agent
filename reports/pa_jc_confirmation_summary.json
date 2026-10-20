@@ -1,0 +1,11 @@
+{
+  "protocol_id": "PMSM159-9P-PA-JC-HMT-TCN-CONF-v6.2",
+  "method": "PA-JC-HMT-TCN",
+  "evaluation_runs": 84,
+  "fault_classes": 7,
+  "primary_metric": "run-level seven-class Macro-F1",
+  "pressure_joint_tcn_macro_f1": 0.902816865040039,
+  "data_origin": "system-level dq/abc proxy-fault simulation",
+  "is_real_motor_measurement": false,
+  "note": "Curated from the local v6.2 confirmation summary; this is research-model provenance, not the public synthetic demo score."
+}
