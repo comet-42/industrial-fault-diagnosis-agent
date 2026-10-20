@@ -2,7 +2,7 @@
 
 ## Agent state
 
-The workflow state consists of the signal schema check, engineered features, model prediction, retrieved engineering interpretation, and validation result. Each tool returns both a typed result and a `ToolTrace`, which makes the run inspectable.
+The Agent state contains the task goal, observations, uncertainty, tool traces, decision traces, and lifecycle status. A `GoalDirectedPlanner` evaluates a registry of tools, applies each tool's precondition and utility score, executes the highest-scoring applicable action, and replans from the new observation.
 
 ## Reliability decisions
 
@@ -10,7 +10,11 @@ The workflow state consists of the signal schema check, engineered features, mod
 - A model label is not exposed as a diagnosis until the validation tool approves it.
 - Every report cites the signal inspection, feature values, model output, and knowledge entry as evidence.
 - Uncertainty is represented explicitly as `fault_family="uncertain"` with an escalation action.
-- The deterministic path is fully offline and reproducible. An LLM can propose actions later, but it cannot directly write a report or bypass the quality gate.
+- The policy is deterministic and fully offline, so it is reproducible. A future LLM planner can propose actions through the same tool contract, but it cannot directly write a report or bypass the quality gate.
+
+## Dynamic paths
+
+The planner does not call every tool on every request. Normal and open-phase cases use the core inspection, feature, model, knowledge, and validation path. Sensor-bias and interturn predictions activate `analyze_fault_evidence`; low-confidence predictions activate `assess_uncertainty`. A tool failure or exhausted action budget terminates with escalation.
 
 ## Connecting the previous PMSM work
 

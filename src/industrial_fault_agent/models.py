@@ -30,6 +30,16 @@ class ToolTrace:
 
 
 @dataclass
+class AgentDecision:
+    """A planner decision recorded before each tool invocation."""
+
+    step: int
+    chosen_tool: str
+    rationale: str
+    candidate_scores: Dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
 class Evidence:
     source: str
     claim: str
@@ -46,6 +56,7 @@ class DiagnosisReport:
     recommended_action: str
     evidence: List[Evidence] = field(default_factory=list)
     tool_trace: List[ToolTrace] = field(default_factory=list)
+    decision_trace: List[AgentDecision] = field(default_factory=list)
     uncertainty: List[str] = field(default_factory=list)
     run_id: Optional[str] = None
 

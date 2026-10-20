@@ -114,6 +114,48 @@
       "status": "ok"
     }
   ],
+  "decision_trace": [
+    {
+      "step": 1,
+      "chosen_tool": "inspect_signal",
+      "rationale": "Check input schema and finite values.",
+      "candidate_scores": {
+        "inspect_signal": 100.0
+      }
+    },
+    {
+      "step": 2,
+      "chosen_tool": "extract_features",
+      "rationale": "Compute interpretable signal descriptors.",
+      "candidate_scores": {
+        "extract_features": 90.0
+      }
+    },
+    {
+      "step": 3,
+      "chosen_tool": "run_diagnostic_model",
+      "rationale": "Infer candidate faults from current evidence.",
+      "candidate_scores": {
+        "run_diagnostic_model": 80.0
+      }
+    },
+    {
+      "step": 4,
+      "chosen_tool": "retrieve_knowledge",
+      "rationale": "Ground the candidate in an engineering action.",
+      "candidate_scores": {
+        "retrieve_knowledge": 70.0
+      }
+    },
+    {
+      "step": 5,
+      "chosen_tool": "validate_diagnosis",
+      "rationale": "Reject unsupported conclusions and trigger escalation.",
+      "candidate_scores": {
+        "validate_diagnosis": 60.0
+      }
+    }
+  ],
   "uncertainty": [],
   "run_id": "db0e9c33e765"
 }

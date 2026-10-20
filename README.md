@@ -3,20 +3,30 @@
 An evidence-grounded Agent for permanent-magnet synchronous motor (PMSM) fault diagnosis. It turns a signal window into a validated engineering report through a traceable tool workflow:
 
 ```mermaid
-flowchart LR
-  A[Signal window] --> B[inspect_signal]
-  B --> C[extract_features]
-  C --> D[run_diagnostic_model]
-  D --> E[retrieve_knowledge]
-  E --> F[validate_diagnosis]
-  F --> G[Evidence-grounded report]
+flowchart TD
+  A[Signal window] --> B[Agent state]
+  B --> C{Planner selects next tool}
+  C -->|quality| D[inspect_signal]
+  C -->|features| E[extract_features]
+  C -->|prediction| F[run_diagnostic_model]
+  C -->|ambiguous| G[assess_uncertainty]
+  C -->|targeted fault| H[analyze_fault_evidence]
+  C -->|grounding| I[retrieve_knowledge]
+  C -->|finish gate| J[validate_diagnosis]
+  D --> B
+  E --> B
+  F --> B
+  G --> B
+  H --> B
+  I --> B
+  J --> K[Report or escalation]
 ```
 
 The quickstart uses deterministic synthetic signals, so the repository runs without private research data, an API key, or a hosted model. The transparent classifier is deliberately an adapter seam. An optional ONNX classifier adapter is included; private artifacts stay outside Git.
 
 ## Why this is an Agent project
 
-The system is more than a classifier. It executes a stateful task with typed tools, chooses the next step from the current result, records a complete trace, retrieves domain knowledge, and refuses to issue a confident diagnosis when quality gates fail. These controls make the service auditable and suitable for integration into an engineering monitoring workflow.
+The system is more than a classifier. It executes a goal-driven state/action loop with a tool registry. At each step the planner scores applicable tools from the current state, chooses one action, observes the result, and replans. A normal case skips targeted analysis; sensor-bias and interturn candidates trigger different evidence tools. The Agent records its decisions, retrieves domain knowledge, and refuses to issue a confident diagnosis when quality gates fail.
 
 ## Quick start
 
@@ -30,7 +40,7 @@ python -m unittest discover -s tests -v
 python scripts/run_demo.py --input data/demo/phase_open_window.csv --output reports/demo_phase_open.json
 ```
 
-Example output includes `fault_family`, `confidence`, `severity`, `evidence`, `recommended_action`, and five `tool_trace` entries. The CLI accepts `normal`, `phase_open`, `interturn_short`, `demagnetization`, and `sensor_bias`.
+Example output includes `fault_family`, `confidence`, `severity`, `evidence`, `recommended_action`, `tool_trace`, and `decision_trace`. The CLI accepts `normal`, `phase_open`, `interturn_short`, `demagnetization`, and `sensor_bias`.
 
 ## Model adapter
 
@@ -91,5 +101,5 @@ This release is an engineering prototype, not a safety-certified protection syst
 ## Roadmap
 
 1. Add a local document retriever for manuals and experiment notes with source citations.
-2. Add an optional LangGraph/OpenAI planner while retaining the deterministic offline path.
+2. Add an optional LangGraph/OpenAI planner behind the same `GoalDirectedPlanner` contract while retaining the deterministic policy as a safe fallback.
 3. Add latency, calibration, grouped cross-condition evaluation, and a small web service.

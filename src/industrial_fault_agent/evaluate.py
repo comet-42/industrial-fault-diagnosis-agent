@@ -13,7 +13,8 @@ def evaluate(seed: int = 100) -> Dict[str, object]:
         report = agent.diagnose(generate_signal(label, seed=seed + i))
         rows.append({"expected": label, "predicted": report.fault_family,
                      "correct": report.fault_family == label,
-                     "confidence": report.confidence, "tool_calls": len(report.tool_trace)})
+                     "confidence": report.confidence, "tool_calls": len(report.tool_trace),
+                     "decision_path": [item.chosen_tool for item in report.decision_trace]})
     accuracy = sum(row["correct"] for row in rows) / len(rows)
     return {"accuracy": accuracy, "n_cases": len(rows), "avg_tool_calls": sum(r["tool_calls"] for r in rows) / len(rows), "cases": rows}
 

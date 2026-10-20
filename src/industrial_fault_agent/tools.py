@@ -73,6 +73,8 @@ def retrieve_knowledge(label: str) -> Tuple[Dict[str, Any], ToolTrace]:
         "interturn_short": ("Elevated high-frequency current content suggests a turn-to-turn short.", "Schedule controlled shutdown and insulation inspection."),
         "demagnetization": ("Balanced but reduced current amplitude is consistent with flux loss.", "Check magnets, temperature history and torque margin."),
         "sensor_bias": ("A persistent channel mean offset suggests a current-sensor bias.", "Check sensor zero, ADC offset and calibration before mechanical intervention."),
+        "ground_unbalance": ("Unequal module current behavior is consistent with a ground-unbalance condition.", "Inspect insulation, grounding paths and module protection before continued operation."),
+        "sensor_noise": ("Excess high-frequency variation suggests a sensor-noise condition.", "Inspect shielding, grounding and sensor wiring before replacing the motor."),
     }
     claim, action = kb.get(label, ("No knowledge entry available.", "Escalate for engineering review."))
     out = {"claim": claim, "recommended_action": action, "source": "pmsm-fault-kb-v1"}
@@ -96,3 +98,61 @@ def validate_diagnosis(label: str, confidence: float, inspection: Dict[str, Any]
            "escalate": not valid}
     return out, _trace("validate_diagnosis", "Reject unsupported conclusions and trigger escalation.",
                        {"label": label, "confidence": confidence}, out)
+
+
+def assess_uncertainty(prediction: Dict[str, Any]) -> Tuple[Dict[str, Any], ToolTrace]:
+    """Decide whether the planner needs an uncertainty gate before reporting."""
+    probabilities = prediction.get("class_probabilities", {})
+    values = sorted((float(value) for value in probabilities.values()), reverse=True)
+    margin = values[0] - values[1] if len(values) > 1 else float(prediction.get("confidence", 0.0))
+    confidence = float(prediction.get("confidence", 0.0))
+    requires_escalation = confidence < 0.60 or margin < 0.10
+    out = {"confidence": confidence, "top_two_margin": margin,
+           "requires_escalation": requires_escalation,
+           "reason": "low confidence or ambiguous top classes" if requires_escalation else "confidence gate passed"}
+    return out, _trace("assess_uncertainty", "Check whether the prediction is decisive enough to continue.",
+                       {"label": prediction.get("label"), "confidence": confidence}, out)
+
+
+def analyze_fault_evidence(label: str, features: Dict[str, Any]) -> Tuple[Dict[str, Any], ToolTrace]:
+    """Run a targeted, label-specific evidence check selected by the planner."""
+    if label == "sensor_bias":
+        offsets = {k: abs(float(features[k]["mean"])) for k in ("i_a", "i_b", "i_c")}
+        strongest = max(offsets, key=offsets.get)
+        supported = offsets[strongest] > 0.75
+        out = {"analysis": "channel_mean_offset", "channel": strongest,
+               "value": offsets[strongest], "supported": supported}
+    elif label == "interturn_short":
+        ratios = {k: float(features[k]["high_frequency_ratio"]) for k in ("i_a", "i_b", "i_c")}
+        strongest = max(ratios, key=ratios.get)
+        supported = ratios[strongest] > 0.22
+        out = {"analysis": "high_frequency_content", "channel": strongest,
+               "value": ratios[strongest], "supported": supported}
+    else:
+        out = {"analysis": "no_targeted_rule", "supported": True}
+    return out, _trace("analyze_fault_evidence", "Select a targeted check for the predicted fault family.",
+                       {"label": label}, out)
+
+
+def analyze_pa_jc_evidence(label: str, window: np.ndarray) -> Tuple[Dict[str, Any], ToolTrace]:
+    """Run a targeted check directly on a standardized 15-channel PA-JC window."""
+    value = np.asarray(window, dtype=float)
+    if value.shape != (15, 500):
+        raise ValueError(f"expected 15x500 PA-JC window, got {value.shape}")
+    channels = ("i1a", "i1b", "i1c", "i2a", "i2b", "i2c", "i3a", "i3b", "i3c")
+    current = value[:9]
+    if label == "sensor_bias":
+        means = np.abs(current.mean(axis=1))
+        index = int(np.argmax(means))
+        out = {"analysis": "current_channel_mean_offset", "channel": channels[index],
+               "value": float(means[index]), "supported": bool(means[index] > 0.75)}
+    elif label == "interturn_short":
+        spectrum = np.abs(np.fft.rfft(current - current.mean(axis=1, keepdims=True), axis=1))
+        ratio = spectrum[:, 40:].sum(axis=1) / (spectrum.sum(axis=1) + 1e-9)
+        index = int(np.argmax(ratio))
+        out = {"analysis": "current_channel_high_frequency_content", "channel": channels[index],
+               "value": float(ratio[index]), "supported": bool(ratio[index] > 0.22)}
+    else:
+        out = {"analysis": "no_targeted_rule", "supported": True}
+    return out, _trace("analyze_pa_jc_evidence", "Select a targeted check for the PA-JC fault family.",
+                       {"label": label, "shape": list(value.shape)}, out)
